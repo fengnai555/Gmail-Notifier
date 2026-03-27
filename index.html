@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Gmail Notifier</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .header h1 {
+            margin: 0;
+            color: #d93025;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+        }
+        .header img {
+            width: 24px;
+            margin-right: 10px;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .countdown {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        button {
+            background-color: #d93025;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #b31d14;
+        }
+        button.secondary {
+            background-color: #f1f3f4;
+            color: #5f6368;
+            border: 1px solid #dadce0;
+        }
+        button.secondary:hover {
+            background-color: #e8eaed;
+        }
+        .email-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .email-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+        .email-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .email-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .email-from {
+            font-weight: bold;
+            color: #1a73e8;
+        }
+        .email-date {
+            font-size: 0.8rem;
+            color: #888;
+        }
+        .email-subject {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .email-body-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .email-snippet {
+            font-size: 0.85rem;
+            color: #666;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-grow: 1;
+        }
+        .copy-btn {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 10px;
+            display: inline-block;
+            white-space: nowrap;
+        }
+        .copy-btn:hover {
+            background-color: #174ea6;
+        }
+        .copy-btn.copied {
+            background-color: #34a853;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><img src="icon.png" alt="Gmail"> Gmail Notifier</h1>
+        <div class="controls">
+            <div class="countdown" id="countdown">正在連線...</div>
+            <button class="secondary" id="logoutBtn">切換帳號</button>
+            <button id="refreshBtn">立即整理</button>
+        </div>
+    </div>
+
+    <div class="email-list" id="emailList">
+        <div class="empty-state">正在讀取郵件...</div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        const countdownEl = document.getElementById('countdown');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const emailListEl = document.getElementById('emailList');
+
+        ipcRenderer.on('countdown-tick', (event, seconds) => {
+            countdownEl.textContent = `下次檢查: ${seconds}秒`;
+        });
+
+        refreshBtn.addEventListener('click', () => {
+            ipcRenderer.send('manual-refresh');
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '刷新中...';
+            setTimeout(() => {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '立即整理';
+            }, 2000);
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            if (confirm('確定要登出並切換帳號嗎？')) {
+                ipcRenderer.send('logout');
+            }
+        });
+
+        ipcRenderer.on('update-emails', (event, emails) => {
+            if (emails.length === 0) {
+                emailListEl.innerHTML = '<div class="empty-state">目前沒有新郵件。</div>';
+                return;
+            }
+
+            emailListEl.innerHTML = emails.map(email => {
+                const code = extractCode(email.subject + ' ' + email.snippet);
+                return `
+                    <div class="email-item" onclick="openEmail('${email.threadId}')">
+                        <div class="email-header">
+                            <span class="email-from">${escapeHtml(email.from)}</span>
+                            <span class="email-date">${email.date}</span>
+                        </div>
+                        <span class="email-subject">${escapeHtml(email.subject)}</span>
+                        <div class="email-body-row">
+                            <div class="email-snippet">${escapeHtml(email.snippet)}</div>
+                            ${code ? `<button class="copy-btn" onclick="copyToClipboard(event, '${code}')">複製驗證碼: ${code}</button>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        });
+
+        function extractCode(text) {
+            const keywords = ['驗證碼', '驗證碼為', '密碼', '碼', 'code', 'verification', 'otp', 'authentication'];
+            const regex = new RegExp(`(${keywords.join('|')})[\\s:：=]*([A-Za-z0-9]{4,10})`, 'i');
+            const match = text.match(regex);
+            if (match && match[2]) return match[2];
+            const fallbackMatch = text.match(/\b\d{6}\b/);
+            return fallbackMatch ? fallbackMatch[0] : null;
+        }
+
+        async function copyToClipboard(event, text) {
+            event.stopPropagation();
+            const btn = event.target;
+            try {
+                await navigator.clipboard.writeText(text);
+                const originalText = btn.textContent;
+                btn.textContent = '已複製！';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy: ', err);
+            }
+        }
+
+        function openEmail(threadId) {
+            const { shell } = require('electron');
+            shell.openExternal(`https://mail.google.com/mail/u/0/#inbox/${threadId}`);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+appId: com.example.gmailnotifier
+productName: GmailNotifier
+win:
+  target: nsis
+  icon: icon.png
+directories:
+  output: dist
