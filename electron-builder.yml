@@ -1,7 +1,14 @@
-appId: com.example.gmailnotifier
-productName: GmailNotifier
-win:
-  target: nsis
-  icon: icon.png
+appId: "com.fengnai555.gmailnotifier"
+productName: "gmail-notifier"  # 統一使用無空格小寫名稱
 directories:
-  output: dist
+  output: "dist"
+win:
+  target: 
+    - "nsis"
+    - "portable"
+    - "zip"       # 新增壓縮包版，作為 100% 成功保險
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: true
+  allowElevation: true   # 要求管理員權限，避免靜默掛死

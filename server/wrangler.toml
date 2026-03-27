@@ -1,0 +1,7 @@
+name = "gmail-notifier-proxy"
+main = "index.js"
+compatibility_date = "2024-03-27"
+
+[vars]
+# 請在部署後使用 `wrangler secret put AUTH_TOKEN` 設定一個隨機字串
+# 請在部署後使用 `wrangler secret put CREDENTIALS_JSON` 設定您的 JSON 內容

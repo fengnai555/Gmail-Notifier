@@ -11,6 +11,51 @@
             padding: 20px;
             color: #333;
         }
+        .view {
+            display: none;
+        }
+        .view.active {
+            display: block;
+        }
+        /* Login View Styles */
+        #loginView {
+            text-align: center;
+            background: white;
+            padding: 50px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 400px;
+            margin: 100px auto;
+        }
+        #loginView img {
+            width: 80px;
+            margin-bottom: 20px;
+        }
+        #loginView h2 {
+            margin: 0 0 10px 0;
+            color: #d93025;
+        }
+        #loginView p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .login-btn {
+            background-color: #d93025;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.3s;
+        }
+        .login-btn:hover {
+            background-color: #b31d14;
+            transform: scale(1.05);
+        }
+
+        /* Main View Header */
         .header {
             display: flex;
             align-items: center;
@@ -136,29 +181,83 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1><img src="icon.png" alt="Gmail"> Gmail Notifier</h1>
-        <div class="controls">
-            <div class="countdown" id="countdown">正在連線...</div>
-            <button class="secondary" id="logoutBtn">切換帳號</button>
-            <button id="refreshBtn">立即整理</button>
-        </div>
+    <!-- Login View -->
+    <div id="loginView" class="view">
+        <img src="icon.png" alt="Gmail">
+        <h2>歡迎使用 Gmail Notifier</h2>
+        <p id="loginStatusLine">請先登入您的 Google 帳號以開始監控郵件</p>
+        <button class="login-btn" id="loginBtn">登入 Google 帳號</button>
     </div>
 
-    <div class="email-list" id="emailList">
-        <div class="empty-state">正在讀取郵件...</div>
+    <!-- Main View -->
+    <div id="mainView" class="view">
+        <div class="header">
+            <h1><img src="icon.png" alt="Gmail"> Gmail Notifier</h1>
+            <div class="controls">
+                <div class="countdown" id="countdown">正在連線...</div>
+                <button class="secondary" id="logoutBtn">切換帳號</button>
+                <button id="refreshBtn">立即整理</button>
+            </div>
+        </div>
+
+        <div class="email-list" id="emailList">
+            <div class="empty-state">正在讀取郵件...</div>
+        </div>
     </div>
 
     <script>
         const { ipcRenderer } = require('electron');
 
+        // 啟動時主動詢問目前登入狀態
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('頁面載入完成，詢問狀態...');
+            ipcRenderer.send('get-login-status');
+        });
+
+        const loginView = document.getElementById('loginView');
+        const mainView = document.getElementById('mainView');
         const countdownEl = document.getElementById('countdown');
         const refreshBtn = document.getElementById('refreshBtn');
         const logoutBtn = document.getElementById('logoutBtn');
+        const loginBtn = document.getElementById('loginBtn');
         const emailListEl = document.getElementById('emailList');
+
+        ipcRenderer.on('login-status', (event, isLoggedIn) => {
+            if (isLoggedIn) {
+                loginView.classList.remove('active');
+                mainView.classList.add('active');
+            } else {
+                mainView.classList.remove('active');
+                loginView.classList.add('active');
+                loginBtn.disabled = false;
+                loginBtn.textContent = '登入 Google 帳號';
+            }
+        });
+
+        ipcRenderer.on('auth-status', (event, message) => {
+            const statusLine = document.getElementById('loginStatusLine');
+            statusLine.textContent = message;
+            statusLine.style.color = '#1a73e8';
+        });
+
+        ipcRenderer.on('auth-error', (event, message) => {
+            // 不再使用 alert，改為直接在介面顯示錯誤資訊
+            const statusLine = document.getElementById('loginStatusLine');
+            statusLine.textContent = '❌ ' + message;
+            statusLine.style.color = '#d93025';
+            
+            loginBtn.disabled = false;
+            loginBtn.textContent = '重試登入';
+        });
 
         ipcRenderer.on('countdown-tick', (event, seconds) => {
             countdownEl.textContent = `下次檢查: ${seconds}秒`;
+        });
+
+        loginBtn.addEventListener('click', () => {
+            ipcRenderer.send('login');
+            loginBtn.disabled = true;
+            loginBtn.textContent = '認證中...';
         });
 
         refreshBtn.addEventListener('click', () => {
@@ -178,7 +277,7 @@
         });
 
         ipcRenderer.on('update-emails', (event, emails) => {
-            if (emails.length === 0) {
+            if (!emails || emails.length === 0) {
                 emailListEl.innerHTML = '<div class="empty-state">目前沒有新郵件。</div>';
                 return;
             }
@@ -202,12 +301,28 @@
         });
 
         function extractCode(text) {
-            const keywords = ['驗證碼', '驗證碼為', '密碼', '碼', 'code', 'verification', 'otp', 'authentication'];
-            const regex = new RegExp(`(${keywords.join('|')})[\\s:：=]*([A-Za-z0-9]{4,10})`, 'i');
-            const match = text.match(regex);
-            if (match && match[2]) return match[2];
-            const fallbackMatch = text.match(/\b\d{6}\b/);
-            return fallbackMatch ? fallbackMatch[0] : null;
+            const cleanText = text.replace(/https?:\/\/\S+/g, '').replace(/\S+@\S+/g, '');
+            const keywordRegex = /(?:驗證碼|code|otp|pin|passcode|pass|碼|認證碼)(?:[\s:：=,\-]|is|are|為|是)*([A-Za-z0-9]{4,10})\b/gi;
+            const matches = [...cleanText.matchAll(keywordRegex)];
+            
+            for (const match of matches) {
+                if (match && match[1]) {
+                    const code = match[1].trim();
+                    const lowerCode = code.toLowerCase();
+                    const excludes = ['your', 'code', 'pass', 'auth', 'this', 'test', 'will', 'that', 'from', 'with', 'here', 'true', 'false'];
+                    
+                    if (!excludes.includes(lowerCode)) {
+                        const hasDigit = /\d/.test(code);
+                        const isAllUpper = /^[A-Z0-9]+$/.test(code);
+                        if (hasDigit || isAllUpper) {
+                            return code;
+                        }
+                    }
+                }
+            }
+            
+            const fallbackDigitMatch = cleanText.match(/\b\d{4,10}\b/);
+            return fallbackDigitMatch ? fallbackDigitMatch[0] : null;
         }
 
         async function copyToClipboard(event, text) {
