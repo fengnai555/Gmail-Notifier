@@ -5,3 +5,6 @@ credentials.json
 client_secret_*.json
 .DS_Store
 *.log
+
+# Exclude Cloudflare Pages website project
+website/
