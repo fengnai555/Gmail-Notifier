@@ -1,5 +1,5 @@
 appId: "com.fengnai555.gmailnotifier"
-productName: "gmail-notifier"  # 統一使用無空格小寫名稱
+productName: "otp-notifier"  # 統一使用無空格小寫名稱
 directories:
   output: "dist"
 win:

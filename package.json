@@ -1,5 +1,5 @@
 {
-  "name": "gmail-notifier",
+  "name": "otp-notifier",
   "version": "1.0.0",
   "description": "",
   "main": "main.js",
@@ -20,7 +20,7 @@
   },
   "build": {
     "appId": "com.fengnai555.gmailnotifier",
-    "productName": "gmail-notifier",
+    "productName": "otp-notifier",
     "directories": {
       "output": "dist"
     },

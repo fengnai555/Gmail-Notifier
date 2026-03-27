@@ -87,7 +87,7 @@ async function sendTypedEmail(typeIndex) {
 
     const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
     const messageParts = [
-      `From: Gmail Notifier Test <${myEmail}>`,
+      `From: Desktop OTP Notifier Test <${myEmail}>`,
       `To: ${myEmail}`,
       `Subject: ${utf8Subject}`,
       `Content-Type: text/plain; charset=utf-8`,
@@ -118,7 +118,7 @@ async function sendTypedEmail(typeIndex) {
 }
 
 async function startRotatedLoopWithCountdown() {
-  console.log('\n--- Gmail Notifier 倒數輪播測試啟動 ---');
+  console.log('\n--- Desktop OTP Notifier 倒數輪播測試啟動 ---');
   let count = 0;
   
   while (true) {

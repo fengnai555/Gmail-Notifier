@@ -1,4 +1,4 @@
-# Gmail Notifier 📧
+# Desktop OTP Notifier 📧
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/fengnai555/Gmail-Notifier)
 [![Electron](https://img.shields.io/badge/platform-Electron-blue.svg)](https://www.electronjs.org/)
@@ -48,8 +48,8 @@ pnpm build
 
 ### 📦 發佈檔案說明 (Releases)
 在 GitHub 的 Releases 頁面中，您會看到以下兩種主要檔案：
-1. **`gmail-notifier Setup X.X.X.exe`**：這是標準的**安裝版** (Installer)。執行後會將程式安裝到您的電腦中並建立捷徑，適合固定使用的電腦。
-2. **`gmail-notifier X.X.X.exe`**：這是**免安裝綠色版** (Portable)。無需安裝，點擊即可直接執行，適合放在隨身碟或不想要更動系統設定的使用者。
+1. **`otp-notifier Setup X.X.X.exe`**：這是標準的**安裝版** (Installer)。執行後會將程式安裝到您的電腦中並建立捷徑，適合固定使用的電腦。
+2. **`otp-notifier X.X.X.exe`**：這是**免安裝綠色版** (Portable)。無需安裝，點擊即可直接執行，適合放在隨身碟或不想要更動系統設定的使用者。
 
 ---
 

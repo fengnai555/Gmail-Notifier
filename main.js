@@ -69,7 +69,7 @@ function createTray() {
     { type: 'separator' },
     { label: '結束程式', click: () => { app.isQuitting = true; app.quit(); } }
   ]);
-  tray.setToolTip('Gmail Notifier');
+  tray.setToolTip('Desktop OTP Notifier');
   tray.setContextMenu(contextMenu);
   tray.on('double-click', () => { mainWindow.show(); });
 }
