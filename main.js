@@ -1,6 +1,30 @@
 const { app, BrowserWindow, Menu, Tray, Notification, shell, ipcMain, net } = require('electron');
 const path = require('path');
-require('dotenv').config();
+const fs = require('fs');
+
+// 🚀 自定義 .env 載入器 (取代 dotenv 解決打包相容性問題)
+function loadEnv() {
+  const envPath = path.join(app.getAppPath(), '.env');
+  if (fs.existsSync(envPath)) {
+    try {
+      const content = fs.readFileSync(envPath, 'utf-8');
+      content.split(/\r?\n/).forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+          const [key, ...valueParts] = trimmed.split('=');
+          process.env[key.trim()] = valueParts.join('=').trim();
+        }
+      });
+      console.log('Env loaded successfully from:', envPath);
+    } catch (err) {
+      console.error('Error reading .env file:', err);
+    }
+  } else {
+    console.warn('.env file not found at:', envPath);
+  }
+}
+loadEnv();
+
 const GmailProvider = require('./src/providers/GmailProvider');
 const TelegramProvider = require('./src/providers/TelegramProvider');
 

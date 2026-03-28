@@ -28,6 +28,9 @@
 
 ### 1. 準備金鑰與雲端設定
 本程式設計為不將金鑰寫死在客戶端，請透過自建 Cloudflare Worker 進行 Proxy：
+> [!TIP]
+> **靈活佈署**：您可以選擇使用官方提供的公共 Worker 位址（快速開始），或是參考 `server/` 資料夾自行架設專屬的 Cloudflare Proxy 以獲得最高隱私權。
+
 1. 準備您的 **Google OAuth 2.0 JSON 憑證** 與 **Telegram Bot Token** (@BotFather 申請)。
 2. 在專案的 `server/` 資料夾中進行 `pnpm run deploy` 發布至 Cloudflare。
 3. 透過 `wrangler secret put` 將上述金鑰存入 Cloudflare Worker 的環境變數中。
