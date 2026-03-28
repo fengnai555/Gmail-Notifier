@@ -173,6 +173,26 @@
         .copy-btn.copied {
             background-color: #34a853;
         }
+        .source-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-right: 8px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .badge-gmail {
+            background-color: #fce8e6;
+            color: #d93025;
+            border: 1px solid #f5c2c7;
+        }
+        .badge-telegram {
+            background-color: #e7f3ff;
+            color: #1a73e8;
+            border: 1px solid #b8daff;
+        }
         .empty-state {
             text-align: center;
             padding: 50px;
@@ -284,10 +304,17 @@
 
             emailListEl.innerHTML = emails.map(email => {
                 const code = extractCode(email.subject + ' ' + email.snippet);
+                const source = email.source || 'Gmail'; // 預設為 Gmail
+                const badgeClass = source.toLowerCase() === 'telegram' ? 'badge-telegram' : 'badge-gmail';
+                const sourceIcon = source.toLowerCase() === 'telegram' ? '✈️' : '📧';
+
                 return `
-                    <div class="email-item" onclick="openEmail('${email.threadId}')">
+                    <div class="email-item" onclick="openEmail('${email.threadId}', '${source}')">
                         <div class="email-header">
-                            <span class="email-from">${escapeHtml(email.from)}</span>
+                            <div>
+                                <span class="source-badge ${badgeClass}">${sourceIcon} ${source}</span>
+                                <span class="email-from">${escapeHtml(email.from)}</span>
+                            </div>
                             <span class="email-date">${email.date}</span>
                         </div>
                         <span class="email-subject">${escapeHtml(email.subject)}</span>
@@ -342,7 +369,11 @@
             }
         }
 
-        function openEmail(threadId) {
+        function openEmail(threadId, source) {
+            if (source && source.toLowerCase() === 'telegram') {
+                // Telegram 訊息目前不支援跳轉，可以改為顯示提示或留空
+                return;
+            }
             const { shell } = require('electron');
             shell.openExternal(`https://mail.google.com/mail/u/0/#inbox/${threadId}`);
         }

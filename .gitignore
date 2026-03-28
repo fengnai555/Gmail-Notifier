@@ -8,3 +8,4 @@ client_secret_*.json
 
 # Exclude Cloudflare Pages website project
 website/
+.env
