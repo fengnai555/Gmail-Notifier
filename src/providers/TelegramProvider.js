@@ -1,11 +1,13 @@
 const BaseProvider = require('./BaseProvider');
 const TelegramBot = require('node-telegram-bot-api');
+const { extractOTP } = require('../utils/otpParser');
 
 class TelegramProvider extends BaseProvider {
   constructor(token) {
     super('Telegram');
     this.token = token;
     this.bot = null;
+    this.allowedChatIds = []; // 預留白名單功能
   }
 
   async initialize() {
@@ -28,7 +30,14 @@ class TelegramProvider extends BaseProvider {
       const text = msg.text;
       if (!text) return;
 
-      // 使用與 Gmail 類似的驗證碼擷取邏輯
+      // 簡單的白名單檢查（如果有的話）
+      if (this.allowedChatIds.length > 0 && !this.allowedChatIds.includes(msg.chat.id)) {
+        return;
+      }
+
+      console.log(`TelegramProvider: 收到來自 ${msg.chat.id} 的訊息`);
+
+      // 使用統一的驗證碼擷取邏輯
       const code = this.extractCode(text);
       if (code) {
         this.notify({
@@ -44,23 +53,7 @@ class TelegramProvider extends BaseProvider {
   }
 
   extractCode(text) {
-    const lowerText = text.toLowerCase();
-    // 偵測常用關鍵字（與 Gmail 共用邏輯）
-    const keywords = ['驗證碼', 'otp', 'verification', 'code', '碼'];
-    const hasKeyword = keywords.some(k => lowerText.includes(k));
-    
-    // 優先找關鍵字後面的 4-8 位數字/英數
-    const matches = lowerText.matchAll(/(驗證碼|code|otp|碼)[\s:：=]*([A-Za-z0-9]{4,10})/gi);
-    for (const match of matches) {
-      if (match && match[2]) {
-        const code = match[2].trim();
-        if (/\d/.test(code)) return code;
-      }
-    }
-
-    // 次要方案：找獨立的 6-8 位純數字
-    const fallback = text.match(/\b\d{6,8}\b/);
-    return fallback ? fallback[0] : null;
+    return extractOTP(text);
   }
 
   stop() {

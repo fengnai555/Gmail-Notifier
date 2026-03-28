@@ -1,6 +1,7 @@
 const BaseProvider = require('./BaseProvider');
 const path = require('path');
 const { Notification, net } = require('electron');
+const { extractOTP } = require('../utils/otpParser');
 
 class GmailProvider extends BaseProvider {
   constructor() {
@@ -32,24 +33,7 @@ class GmailProvider extends BaseProvider {
    * 核心精準過濾邏輯
    */
   extractVerificationCode(email) {
-    const text = (email.subject + ' ' + email.snippet).toLowerCase();
-    const keywords = ['驗證碼', '驗證代碼', '驗證金鑰', 'otp', 'verification code', 'auth code', 'security code', '驗證', '您的代碼', '單次密碼', 'code', 'password', 'pin', 'passcode'];
-    const hasKeyword = keywords.some(k => text.includes(k));
-    if (!hasKeyword) return null;
-
-    const matches = text.matchAll(/(驗證碼|code|otp|驗證|碼)[\s:：=]*([A-Za-z0-9]{4,10})/gi);
-    for (const match of matches) {
-      if (match && match[2]) {
-        const code = match[2].trim();
-        const hasDigit = /\d/.test(code);
-        const excludes = ['your', 'code', 'pass', 'auth', 'this', 'test', 'will', 'is', 'the', 'for'];
-        if (hasDigit && !excludes.includes(code.toLowerCase())) {
-          return code;
-        }
-      }
-    }
-    const fallback = text.match(/\b\d{6,10}\b/);
-    return fallback ? fallback[0] : null;
+    return extractOTP(email.subject + ' ' + email.snippet);
   }
 
   async check() {

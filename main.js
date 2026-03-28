@@ -9,6 +9,8 @@ let mainWindow = null;
 let isChecking = false;
 let timeLeft = 60;
 let timerInterval = null;
+let lastTelegramMessages = []; // 用於存放最近的 Telegram 訊息快照
+let latestOTP = null; // 記錄最近的一個驗證碼
 
 // ==========================================
 // ⚙️ 配置區 (已改由 .env 讀取)
@@ -22,6 +24,8 @@ const telegramProvider = new TelegramProvider(TELEGRAM_BOT_TOKEN);
 
 // 統一處理來自 Providers 的驗證碼通知
 function handleNewOTP(data) {
+  latestOTP = data;
+  updateTray(); // 收到新碼時更新托盤
   new Notification({
     title: `${data.source} 驗證碼通知`,
     body: `來自 ${data.from} 的驗證碼: ${data.code}`,
@@ -31,6 +35,30 @@ function handleNewOTP(data) {
 
 // 綁定回調
 gmailProvider.onNewOTP = handleNewOTP;
+
+// Telegram 收到新訊息時，除了通知也要更新列表
+function handleTelegramOTP(data) {
+  handleNewOTP(data);
+  // 將 Telegram 訊息轉換為與 Email 類似的格式放入快照列表
+  const telegramItem = {
+    id: `tg-${Date.now()}`,
+    threadId: '', // Telegram 無 Thread ID
+    snippet: data.body,
+    subject: `Telegram 訊息: ${data.code}`,
+    from: data.from,
+    date: new Date().toLocaleString(),
+    source: 'Telegram'
+  };
+  
+  // 保持快照在 5 筆以內，並放在最前面
+  lastTelegramMessages.unshift(telegramItem);
+  if (lastTelegramMessages.length > 5) lastTelegramMessages.pop();
+  
+  // 即時通知前端更新列表
+  if (mainWindow) {
+    performEmailCheck(); // Telegram 到了，我們同步觸發一次完整檢查來合成列表
+  }
+}
 
 let serverConfig = null;
 
@@ -76,14 +104,34 @@ function createTray() {
   if (tray) return;
   const iconPath = path.join(__dirname, 'icon.png');
   tray = new Tray(iconPath);
-  const contextMenu = Menu.buildFromTemplate([
-    { label: '顯示主視窗', click: () => mainWindow.show() },
-    { type: 'separator' },
-    { label: '結束程式', click: () => { app.isQuitting = true; app.quit(); } }
-  ]);
+  updateTray();
   tray.setToolTip('Desktop OTP Notifier');
-  tray.setContextMenu(contextMenu);
   tray.on('double-click', () => { mainWindow.show(); });
+}
+
+function updateTray() {
+  if (!tray) return;
+  const template = [
+    { label: '顯示主視窗', click: () => mainWindow.show() },
+    { type: 'separator' }
+  ];
+
+  if (latestOTP) {
+    template.push({ 
+      label: `最新碼: ${latestOTP.code} (${latestOTP.source})`, 
+      click: () => {
+        const { clipboard } = require('electron');
+        clipboard.writeText(latestOTP.code);
+        new Notification({ title: '已複製', body: `驗證碼 ${latestOTP.code} 已複製到剪貼簿` }).show();
+      } 
+    });
+    template.push({ type: 'separator' });
+  }
+
+  template.push({ label: '結束程式', click: () => { app.isQuitting = true; app.quit(); } });
+  
+  const contextMenu = Menu.buildFromTemplate(template);
+  tray.setContextMenu(contextMenu);
 }
 
 async function performEmailCheck() {
@@ -95,8 +143,14 @@ async function performEmailCheck() {
     // 注入來源標記
     if (emailList) {
       emailList = emailList.map(e => ({ ...e, source: 'Gmail' }));
+    } else {
+      emailList = [];
     }
-    if (mainWindow) mainWindow.webContents.send('update-emails', emailList);
+
+    // 合併 Telegram 快照
+    const combinedList = [...lastTelegramMessages, ...emailList];
+    
+    if (mainWindow) mainWindow.webContents.send('update-emails', combinedList);
   } catch (error) {
     console.error('Email check error:', error);
   } finally {
@@ -129,10 +183,11 @@ app.whenReady().then(async () => {
       await fs.access(tokenPath);
       // 成功讀取後才初始化 Telegram
       const config = await fetchRemoteConfig();
-      if (config.TELEGRAM_BOT_TOKEN) {
-        telegramProvider.token = config.TELEGRAM_BOT_TOKEN;
+      const botToken = config.TELEGRAM_BOT_TOKEN || config.token || config.TELEGRAM_TOKEN;
+      if (botToken) {
+        telegramProvider.token = botToken.trim();
         await telegramProvider.initialize();
-        telegramProvider.onNewOTP = handleNewOTP;
+        telegramProvider.onNewOTP = handleTelegramOTP;
         telegramProvider.start();
       }
       await performEmailCheck();
@@ -148,12 +203,21 @@ app.whenReady().then(async () => {
       mainWindow.webContents.send('auth-status', '正在載入雲端配置...');
       const config = await fetchRemoteConfig();
       const { authorize } = require('./auth');
-      await authorize(config.GMAIL_CREDENTIALS);
       
-      if (config.TELEGRAM_BOT_TOKEN) {
-        telegramProvider.token = config.TELEGRAM_BOT_TOKEN;
+      // 容錯機制：如果 config 裡面沒有 GMAIL_CREDENTIALS，但 config 本身具有 installed 或 web 屬性，
+      // 就代表整個 config 就是 credentials 物件。
+      const gmailCreds = config.GMAIL_CREDENTIALS || (config.installed || config.web ? config : null);
+      if (!gmailCreds) {
+        throw new Error('無法從雲端配置中找到 Google API 憑證 (credentials)');
+      }
+      
+      await authorize(gmailCreds);
+      
+      const botToken = config.TELEGRAM_BOT_TOKEN || config.token || config.TELEGRAM_TOKEN;
+      if (botToken) {
+        telegramProvider.token = botToken.trim();
         await telegramProvider.initialize();
-        telegramProvider.onNewOTP = handleNewOTP;
+        telegramProvider.onNewOTP = handleTelegramOTP;
         telegramProvider.start();
       }
 

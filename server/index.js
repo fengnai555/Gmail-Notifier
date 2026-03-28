@@ -20,8 +20,14 @@ app.get('/', (c) => {
 
   try {
     // 伺服器端先嘗試解析一次，確保給客戶端的是乾淨的 JSON 物件
-    const data = typeof credentials === 'string' ? JSON.parse(credentials.trim()) : credentials
-    return c.json(data)
+    const credentialsData = typeof credentials === 'string' ? JSON.parse(credentials.trim()) : credentials
+    const botToken = c.env.TELEGRAM_BOT_TOKEN
+    
+    // 合成包含 Gmail 憑證與 Telegram Bot Token 的大物件
+    return c.json({
+      GMAIL_CREDENTIALS: credentialsData,
+      TELEGRAM_BOT_TOKEN: botToken || null
+    })
   } catch (err) {
     return c.json({ error: 'INVALID_JSON_FORMAT', message: err.message }, 500)
   }

@@ -227,6 +227,7 @@
 
     <script>
         const { ipcRenderer } = require('electron');
+        const { extractOTP } = require('./src/utils/otpParser');
 
         // 啟動時主動詢問目前登入狀態
         window.addEventListener('DOMContentLoaded', () => {
@@ -303,7 +304,7 @@
             }
 
             emailListEl.innerHTML = emails.map(email => {
-                const code = extractCode(email.subject + ' ' + email.snippet);
+                const code = extractOTP(email.subject + ' ' + email.snippet);
                 const source = email.source || 'Gmail'; // 預設為 Gmail
                 const badgeClass = source.toLowerCase() === 'telegram' ? 'badge-telegram' : 'badge-gmail';
                 const sourceIcon = source.toLowerCase() === 'telegram' ? '✈️' : '📧';
@@ -327,30 +328,7 @@
             }).join('');
         });
 
-        function extractCode(text) {
-            const cleanText = text.replace(/https?:\/\/\S+/g, '').replace(/\S+@\S+/g, '');
-            const keywordRegex = /(?:驗證碼|code|otp|pin|passcode|pass|碼|認證碼)(?:[\s:：=,\-]|is|are|為|是)*([A-Za-z0-9]{4,10})\b/gi;
-            const matches = [...cleanText.matchAll(keywordRegex)];
-            
-            for (const match of matches) {
-                if (match && match[1]) {
-                    const code = match[1].trim();
-                    const lowerCode = code.toLowerCase();
-                    const excludes = ['your', 'code', 'pass', 'auth', 'this', 'test', 'will', 'that', 'from', 'with', 'here', 'true', 'false'];
-                    
-                    if (!excludes.includes(lowerCode)) {
-                        const hasDigit = /\d/.test(code);
-                        const isAllUpper = /^[A-Z0-9]+$/.test(code);
-                        if (hasDigit || isAllUpper) {
-                            return code;
-                        }
-                    }
-                }
-            }
-            
-            const fallbackDigitMatch = cleanText.match(/\b\d{4,10}\b/);
-            return fallbackDigitMatch ? fallbackDigitMatch[0] : null;
-        }
+        // extractCode 函式已由外部 otpParser 取代
 
         async function copyToClipboard(event, text) {
             event.stopPropagation();
